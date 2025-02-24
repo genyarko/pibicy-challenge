@@ -1,0 +1,20 @@
+{
+  "dependencies": {
+    "docxtemplater": "^3.60.0",
+    "konva": "^8.4.3",
+    "lucide-react": "^0.475.0",
+    "mammoth": "^1.9.0",
+    "pdfjs-dist": "^4.10.38",
+    "pizzip": "^3.1.8",
+    "react": "^18.2.0",
+    "react-doc-viewer": "^0.1.14",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.3.5",
+    "react-image-file-resizer": "^0.4.8",
+    "react-konva": "^18.2.4",
+    "react-scripts": "^5.0.1",
+    "react-simple-image-viewer": "^1.2.2",
+    "web-vitals": "^4.2.4",
+    "xlsx": "^0.18.5"
+  }
+}
