@@ -4,6 +4,8 @@
     "konva": "^8.4.3",
     "lucide-react": "^0.475.0",
     "mammoth": "^1.9.0",
+    "msgreader": "^1.0.1",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
     "pizzip": "^3.1.8",
     "react": "^18.2.0",

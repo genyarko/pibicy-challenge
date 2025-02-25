@@ -45,6 +45,26 @@ const AnnotationTools = ({ currentTool, setCurrentTool }) => {
                 >
                     <Type size={24} />
                 </button>
+                <button
+                    className={`p-2 border rounded ${currentTool === 'highlight' ? 'bg-blue-100 border-blue-500' : 'border-gray-300'
+                        }`}
+                    onClick={() => handleToolClick('highlight')}
+                    title="Add Transparent Highlight"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2" opacity="0.3" />
+                    </svg>
+                </button>
+                <button
+                    className={`p-2 border rounded ${currentTool === 'opaque' ? 'bg-blue-100 border-blue-500' : 'border-gray-300'
+                        }`}
+                    onClick={() => handleToolClick('opaque')}
+                    title="Add Opaque Highlight"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                    </svg>
+                </button>
             </div>
             <p className="mt-2 text-sm text-gray-600">
                 {currentTool
