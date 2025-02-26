@@ -1,5 +1,9 @@
 {
+  "name": "pibicy-frontend-challenge",
+  "version": "1.0.0",
+  "private": true,
   "dependencies": {
+    "cfb": "^1.2.2",
     "docxtemplater": "^3.60.0",
     "konva": "^8.4.3",
     "lucide-react": "^0.475.0",
@@ -18,5 +22,33 @@
     "react-simple-image-viewer": "^1.2.2",
     "web-vitals": "^4.2.4",
     "xlsx": "^0.18.5"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "engines": {
+    "node": "22.13.0",
+    "npm": "11.1.0"
   }
 }

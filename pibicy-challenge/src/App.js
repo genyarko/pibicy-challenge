@@ -411,7 +411,7 @@ function App() {
   };
 
   // --------------------------------------------------------------------------
-  // Save Document Functionality using PDF-lib
+  // Save Document Functionality using PDF-lib (for PDFs)
   // --------------------------------------------------------------------------
   const saveDocument = async () => {
     if (!file) return;
@@ -489,8 +489,6 @@ function App() {
               break;
             }
             case 'highlight': {
-              // Use a lighter yellow to simulate transparency,
-              // as PDF-lib does not support opacity in drawing functions.
               const x = annotation.startX * scaleX;
               const height = (annotation.endY - annotation.startY) * scaleY;
               const y = pageHeight - annotation.startY * scaleY - height;
@@ -500,7 +498,7 @@ function App() {
                 y,
                 width,
                 height,
-                color: rgb(1, 1, 0.8), // Lighter yellow to simulate transparency
+                color: rgb(1, 1, 0.8),
               });
               break;
             }
@@ -540,6 +538,119 @@ function App() {
         console.error('Error saving annotated PDF:', error);
         alert('Error saving annotated PDF.');
       }
+    } else {
+      alert('Save functionality for this file type is not implemented.');
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // Save Annotated Image Functionality
+  // --------------------------------------------------------------------------
+  const saveAnnotatedImage = () => {
+    if (!file || !file.type.includes('image')) return;
+
+    // Create an off-screen canvas with the same dimensions as the displayed image.
+    const canvas = document.createElement('canvas');
+    canvas.width = imgDimensions.width;
+    canvas.height = imgDimensions.height;
+    const ctx = canvas.getContext('2d');
+
+    // Create an Image instance to load the base image.
+    const baseImage = new Image();
+    baseImage.src = file.url;
+    baseImage.onload = () => {
+      // Draw the base image.
+      ctx.drawImage(baseImage, 0, 0, imgDimensions.width, imgDimensions.height);
+
+      // Render each annotation.
+      annotations.forEach((annotation) => {
+        switch (annotation.type) {
+          case 'line': {
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(annotation.startX, annotation.startY);
+            ctx.lineTo(annotation.endX, annotation.endY);
+            ctx.stroke();
+            break;
+          }
+          case 'rectangle': {
+            ctx.strokeStyle = 'blue';
+            ctx.lineWidth = 2;
+            const width = annotation.endX - annotation.startX;
+            const height = annotation.endY - annotation.startY;
+            ctx.strokeRect(annotation.startX, annotation.startY, width, height);
+            break;
+          }
+          case 'circle': {
+            ctx.strokeStyle = 'green';
+            ctx.lineWidth = 2;
+            const radius = Math.sqrt(
+              Math.pow(annotation.endX - annotation.startX, 2) +
+              Math.pow(annotation.endY - annotation.startY, 2)
+            );
+            ctx.beginPath();
+            ctx.arc(annotation.startX, annotation.startY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            break;
+          }
+          case 'text': {
+            ctx.fillStyle = 'red';
+            ctx.font = '16px sans-serif';
+            ctx.fillText(annotation.text, annotation.x, annotation.y);
+            break;
+          }
+          case 'highlight': {
+            const width = annotation.endX - annotation.startX;
+            const height = annotation.endY - annotation.startY;
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+            ctx.fillRect(annotation.startX, annotation.startY, width, height);
+            break;
+          }
+          case 'opaque': {
+            const width = annotation.endX - annotation.startX;
+            const height = annotation.endY - annotation.startY;
+            ctx.fillStyle = 'black';
+            ctx.fillRect(annotation.startX, annotation.startY, width, height);
+            break;
+          }
+          default:
+            break;
+        }
+      });
+
+      // Convert the canvas to a blob and trigger a download.
+      canvas.toBlob((blob) => {
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        const extIndex = file.name.lastIndexOf('.');
+        const filename =
+          extIndex > 0
+            ? file.name.substring(0, extIndex) + '_annotated.png'
+            : file.name + '_annotated.png';
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+      }, 'image/png');
+    };
+
+    baseImage.onerror = () => {
+      alert('Failed to load the image.');
+    };
+  };
+
+  // --------------------------------------------------------------------------
+  // General Save File Functionality
+  // --------------------------------------------------------------------------
+  const saveFile = () => {
+    if (!file) return;
+    if (file.type.includes('pdf')) {
+      saveDocument();
+    } else if (file.type.includes('image')) {
+      saveAnnotatedImage();
     } else {
       alert('Save functionality for this file type is not implemented.');
     }
@@ -828,7 +939,7 @@ function App() {
             {renderFilePreview()}
           </div>
           <div className="mb-6">
-            <button className="px-4 py-2 bg-green-500 text-white rounded" onClick={saveDocument}>
+            <button className="px-4 py-2 bg-green-500 text-white rounded" onClick={saveFile}>
               Save Document
             </button>
           </div>
