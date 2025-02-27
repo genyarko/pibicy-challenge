@@ -6,6 +6,9 @@ import mammoth from 'mammoth';
 import MsgReader from 'msgreader';
 import * as XLSX from 'xlsx';
 import { PDFDocument, rgb } from 'pdf-lib';
+import html2canvas from 'html2canvas';
+import htmlDocx from 'html-docx-js/dist/html-docx';
+import ExcelJS from 'exceljs';
 
 import FileUpload from './components/FileUpload';
 import AnnotationTools from './components/AnnotationTools';
@@ -54,8 +57,6 @@ function App() {
   const handleFileUpload = (e) => {
     const uploadedFile = e.target.files[0];
     if (!uploadedFile) return;
-
-    console.log('Uploaded file:', uploadedFile);
 
     // Allowed MIME types (also checking extensions for .msg and Excel)
     const allowedTypes = [
@@ -146,13 +147,11 @@ function App() {
       (uploadedFile.type && uploadedFile.type.includes('outlook')) ||
       uploadedFile.name.toLowerCase().endsWith('.msg')
     ) {
-      console.log('Detected .msg file. Processing...');
       fileReader.onload = (event) => {
         const arrayBuffer = event.target.result;
         try {
           const reader = new MsgReader(arrayBuffer);
           const msg = reader.getFileData();
-          console.log('Parsed MSG file:', msg);
           const content = msg.bodyHTML || msg.body || '<p>No content available.</p>';
           setDocHtml(content);
           setFile({
@@ -417,19 +416,16 @@ function App() {
     if (!file) return;
     if (file.type.includes('pdf')) {
       try {
-        // Load the original PDF from ArrayBuffer
         const pdfDoc = await PDFDocument.load(file.url);
         const pages = pdfDoc.getPages();
-        const pageIndex = currentPage - 1; // currentPage is 1-indexed
+        const pageIndex = currentPage - 1;
         const page = pages[pageIndex];
         const pageWidth = page.getWidth();
         const pageHeight = page.getHeight();
 
-        // Compute scale factors from canvas dimensions to PDF page dimensions.
         const scaleX = pageWidth / canvasDimensions.width;
         const scaleY = pageHeight / canvasDimensions.height;
 
-        // Draw each annotation onto the PDF page.
         annotations.forEach((annotation) => {
           switch (annotation.type) {
             case 'line': {
@@ -521,7 +517,6 @@ function App() {
           }
         });
 
-        // Save the modified PDF and trigger download.
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
         const downloadUrl = URL.createObjectURL(blob);
@@ -544,25 +539,19 @@ function App() {
   };
 
   // --------------------------------------------------------------------------
-  // Save Annotated Image Functionality
+  // Save Annotated Image Functionality (for Images)
   // --------------------------------------------------------------------------
   const saveAnnotatedImage = () => {
     if (!file || !file.type.includes('image')) return;
-
-    // Create an off-screen canvas with the same dimensions as the displayed image.
     const canvas = document.createElement('canvas');
     canvas.width = imgDimensions.width;
     canvas.height = imgDimensions.height;
     const ctx = canvas.getContext('2d');
 
-    // Create an Image instance to load the base image.
     const baseImage = new Image();
     baseImage.src = file.url;
     baseImage.onload = () => {
-      // Draw the base image.
       ctx.drawImage(baseImage, 0, 0, imgDimensions.width, imgDimensions.height);
-
-      // Render each annotation.
       annotations.forEach((annotation) => {
         switch (annotation.type) {
           case 'line': {
@@ -619,16 +608,12 @@ function App() {
         }
       });
 
-      // Convert the canvas to a blob and trigger a download.
       canvas.toBlob((blob) => {
         const downloadUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
         const extIndex = file.name.lastIndexOf('.');
-        const filename =
-          extIndex > 0
-            ? file.name.substring(0, extIndex) + '_annotated.png'
-            : file.name + '_annotated.png';
+        const filename = extIndex > 0 ? file.name.substring(0, extIndex) + '_annotated.png' : file.name + '_annotated.png';
         a.download = filename;
         document.body.appendChild(a);
         a.click();
@@ -643,6 +628,178 @@ function App() {
   };
 
   // --------------------------------------------------------------------------
+  // Save DOCX File Functionality (for Word files)
+  // --------------------------------------------------------------------------
+  const saveDocFile = () => {
+    if (!file || !file.type.includes('word')) return;
+    const container = document.getElementById('doc-annotated');
+    if (!container) {
+      alert('Document container not found.');
+      return;
+    }
+    const clone = container.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.top = '0';
+    clone.style.left = '0';
+    clone.style.width = container.scrollWidth + 'px';
+    clone.style.height = container.scrollHeight + 'px';
+    clone.style.overflow = 'visible';
+    document.body.appendChild(clone);
+
+    html2canvas(clone, {
+      scale: 2,
+      width: clone.scrollWidth,
+      height: clone.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: clone.scrollWidth,
+      windowHeight: clone.scrollHeight,
+      useCORS: true,
+    }).then((canvas) => {
+      document.body.removeChild(clone);
+      const dataUrl = canvas.toDataURL('image/png');
+      const htmlContent = `<html><body><img src="${dataUrl}" /></body></html>`;
+      const converted = htmlDocx.asBlob(htmlContent);
+      const downloadUrl = URL.createObjectURL(converted);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      const extIndex = file.name.lastIndexOf('.');
+      const filename = extIndex > 0 ? file.name.substring(0, extIndex) + '_annotated.docx' : file.name + '_annotated.docx';
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+    });
+  };
+
+  // --------------------------------------------------------------------------
+  // Save Excel File Functionality (for Excel files)
+  // --------------------------------------------------------------------------
+  const saveExcelFile = () => {
+    if (!file || !(file.type.includes('excel') || file.name.toLowerCase().endsWith('.xls') || file.name.toLowerCase().endsWith('.xlsx')))
+      return;
+    const container = document.getElementById('doc-annotated');
+    if (!container) {
+      alert('Document container not found.');
+      return;
+    }
+    const clone = container.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.top = '0';
+    clone.style.left = '0';
+    clone.style.width = container.scrollWidth + 'px';
+    clone.style.height = container.scrollHeight + 'px';
+    clone.style.overflow = 'visible';
+    document.body.appendChild(clone);
+
+    html2canvas(clone, {
+      scale: 2,
+      width: clone.scrollWidth,
+      height: clone.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: clone.scrollWidth,
+      windowHeight: clone.scrollHeight,
+      useCORS: true,
+    }).then((canvas) => {
+      document.body.removeChild(clone);
+      const dataUrl = canvas.toDataURL('image/png');
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Annotated');
+      const imageId = workbook.addImage({
+        base64: dataUrl,
+        extension: 'png',
+      });
+      worksheet.addImage(imageId, {
+        tl: { col: 0, row: 0 },
+        ext: { width: canvas.width, height: canvas.height },
+      });
+
+      workbook.xlsx.writeBuffer().then((buffer) => {
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        const extIndex = file.name.lastIndexOf('.');
+        const filename = extIndex > 0 ? file.name.substring(0, extIndex) + '_annotated.xlsx' : file.name + '_annotated.xlsx';
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+      });
+    });
+  };
+
+  // --------------------------------------------------------------------------
+  // Save MSG File Functionality (for Outlook .msg files) via Serverless API
+  // --------------------------------------------------------------------------
+  const saveMsgFile = () => {
+    if (!file || !(file.type.includes('outlook') || file.name.toLowerCase().endsWith('.msg')))
+      return;
+    const container = document.getElementById('doc-annotated');
+    if (!container) {
+      alert('Document container not found.');
+      return;
+    }
+    const clone = container.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.top = '0';
+    clone.style.left = '0';
+    clone.style.width = container.scrollWidth + 'px';
+    clone.style.height = container.scrollHeight + 'px';
+    clone.style.overflow = 'visible';
+    document.body.appendChild(clone);
+
+    html2canvas(clone, {
+      scale: 2,
+      width: clone.scrollWidth,
+      height: clone.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: clone.scrollWidth,
+      windowHeight: clone.scrollHeight,
+      useCORS: true,
+    }).then((canvas) => {
+      document.body.removeChild(clone);
+      const dataUrl = canvas.toDataURL('image/png');
+      // Call the serverless function to process the annotated MSG.
+      processAnnotatedMsg(dataUrl);
+    });
+  };
+
+  // Helper function to call the serverless endpoint
+  const processAnnotatedMsg = async (dataUrl) => {
+    // Remove the prefix to get the base64 string.
+    const base64Data = dataUrl.split(',')[1];
+    try {
+      const response = await fetch('/api/convert-msg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64Data }),
+      });
+      if (!response.ok) {
+        throw new Error('Server processing failed');
+      }
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      const extIndex = file.name.lastIndexOf('.');
+      const filename = extIndex > 0 ? file.name.substring(0, extIndex) + '_annotated.msg' : file.name + '_annotated.msg';
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Error processing MSG file on server:', error);
+      alert('Error processing MSG file');
+    }
+  };
+
+  // --------------------------------------------------------------------------
   // General Save File Functionality
   // --------------------------------------------------------------------------
   const saveFile = () => {
@@ -651,6 +808,12 @@ function App() {
       saveDocument();
     } else if (file.type.includes('image')) {
       saveAnnotatedImage();
+    } else if (file.type.includes('word')) {
+      saveDocFile();
+    } else if (file.type.includes('excel') || file.name.toLowerCase().endsWith('.xls') || file.name.toLowerCase().endsWith('.xlsx')) {
+      saveExcelFile();
+    } else if (file.type.includes('outlook') || file.name.toLowerCase().endsWith('.msg')) {
+      saveMsgFile();
     } else {
       alert('Save functionality for this file type is not implemented.');
     }
@@ -661,7 +824,6 @@ function App() {
   // --------------------------------------------------------------------------
   const renderFilePreview = () => {
     if (!file) return null;
-
     // --- For Images ---
     if (file.type.includes('image')) {
       return (
@@ -701,62 +863,22 @@ function App() {
             {currentAnnotation && <Annotation annotation={currentAnnotation} />}
           </svg>
           {showTextInput && (
-            <div
-              style={{
-                position: 'fixed',
-                top: textPosition.y,
-                left: textPosition.x,
-                zIndex: 9999,
-                backgroundColor: 'white',
-                border: '1px solid gray',
-                padding: '4px',
-              }}
-            >
-              <input
-                type="text"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                autoFocus
-                style={{ border: '1px solid gray', padding: '2px' }}
-              />
-              <button
-                onClick={handleTextSubmit}
-                style={{ backgroundColor: 'blue', color: 'white', marginLeft: '4px' }}
-              >
-                Add
-              </button>
+            <div style={{ position: 'fixed', top: textPosition.y, left: textPosition.x, zIndex: 9999, backgroundColor: 'white', border: '1px solid gray', padding: '4px' }}>
+              <input type="text" value={textInput} onChange={(e) => setTextInput(e.target.value)} autoFocus style={{ border: '1px solid gray', padding: '2px' }} />
+              <button onClick={handleTextSubmit} style={{ backgroundColor: 'blue', color: 'white', marginLeft: '4px' }}>Add</button>
             </div>
           )}
         </div>
       );
     }
-
     // --- For PDFs ---
     if (file.type.includes('pdf')) {
       return (
-        <div
-          className="relative"
-          style={{
-            width: canvasDimensions.width ? `${canvasDimensions.width}px` : 'auto',
-            height: canvasDimensions.height ? `${canvasDimensions.height}px` : 'auto',
-          }}
-        >
-          <canvas
-            ref={pdfCanvasRef}
-            className="border border-gray-300"
-            style={{ position: 'absolute', top: 0, left: 0, zIndex: 1, pointerEvents: 'none' }}
-          />
+        <div className="relative" style={{ width: canvasDimensions.width ? `${canvasDimensions.width}px` : 'auto', height: canvasDimensions.height ? `${canvasDimensions.height}px` : 'auto' }}>
+          <canvas ref={pdfCanvasRef} className="border border-gray-300" style={{ position: 'absolute', top: 0, left: 0, zIndex: 1, pointerEvents: 'none' }} />
           <svg
             ref={overlayRef}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: `${canvasDimensions.width}px`,
-              height: `${canvasDimensions.height}px`,
-              zIndex: 2,
-              pointerEvents: 'auto',
-            }}
+            style={{ position: 'absolute', top: 0, left: 0, width: `${canvasDimensions.width}px`, height: `${canvasDimensions.height}px`, zIndex: 2, pointerEvents: 'auto' }}
             onClick={(e) => { if (currentTool === 'text') handleTextClick(e); }}
             onMouseDown={(e) => { if (currentTool !== 'text') handleMouseDown(e); }}
             onMouseMove={(e) => { if (currentTool !== 'text') handleMouseMove(e); }}
@@ -768,57 +890,21 @@ function App() {
             {currentAnnotation && <Annotation annotation={currentAnnotation} />}
           </svg>
           {showTextInput && (
-            <div
-              style={{
-                position: 'fixed',
-                top: textPosition.y,
-                left: textPosition.x,
-                zIndex: 9999,
-                backgroundColor: 'white',
-                border: '1px solid gray',
-                padding: '4px',
-              }}
-            >
-              <input
-                type="text"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                autoFocus
-                style={{ border: '1px solid gray', padding: '2px' }}
-              />
-              <button
-                onClick={handleTextSubmit}
-                style={{ backgroundColor: 'blue', color: 'white', marginLeft: '4px' }}
-              >
-                Add
-              </button>
+            <div style={{ position: 'fixed', top: textPosition.y, left: textPosition.x, zIndex: 9999, backgroundColor: 'white', border: '1px solid gray', padding: '4px' }}>
+              <input type="text" value={textInput} onChange={(e) => setTextInput(e.target.value)} autoFocus style={{ border: '1px solid gray', padding: '2px' }} />
+              <button onClick={handleTextSubmit} style={{ backgroundColor: 'blue', color: 'white', marginLeft: '4px' }}>Add</button>
             </div>
           )}
           {totalPages > 1 && (
             <div className="flex justify-between mt-2">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-              >
-                Next
-              </button>
+              <button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50">Previous</button>
+              <span className="text-sm text-gray-700">Page {currentPage} of {totalPages}</span>
+              <button onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50">Next</button>
             </div>
           )}
         </div>
       );
     }
-
     // --- For Word, Excel, and Outlook (.msg) ---
     if (
       file.type.includes('word') ||
@@ -855,19 +941,11 @@ function App() {
         );
       }
       return (
-        <div style={{ position: 'relative' }}>
+        <div id="doc-annotated" style={{ position: 'relative', overflow: 'visible', height: 'auto', maxHeight: 'none' }}>
           <div className="border border-gray-300 p-4">{content}</div>
           <svg
             ref={overlayRef}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              zIndex: 2,
-              pointerEvents: 'auto',
-            }}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'auto' }}
             onClick={(e) => { if (currentTool === 'text') handleTextClick(e); }}
             onMouseDown={(e) => { if (currentTool !== 'text') handleMouseDown(e); }}
             onMouseMove={(e) => { if (currentTool !== 'text') handleMouseMove(e); }}
@@ -879,36 +957,14 @@ function App() {
             {currentAnnotation && <Annotation annotation={currentAnnotation} />}
           </svg>
           {showTextInput && (
-            <div
-              style={{
-                position: 'fixed',
-                top: textPosition.y,
-                left: textPosition.x,
-                zIndex: 9999,
-                backgroundColor: 'white',
-                border: '1px solid gray',
-                padding: '4px',
-              }}
-            >
-              <input
-                type="text"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                autoFocus
-                style={{ border: '1px solid gray', padding: '2px' }}
-              />
-              <button
-                onClick={handleTextSubmit}
-                style={{ backgroundColor: 'blue', color: 'white', marginLeft: '4px' }}
-              >
-                Add
-              </button>
+            <div style={{ position: 'fixed', top: textPosition.y, left: textPosition.x, zIndex: 9999, backgroundColor: 'white', border: '1px solid gray', padding: '4px' }}>
+              <input type="text" value={textInput} onChange={(e) => setTextInput(e.target.value)} autoFocus style={{ border: '1px solid gray', padding: '2px' }} />
+              <button onClick={handleTextSubmit} style={{ backgroundColor: 'blue', color: 'white', marginLeft: '4px' }}>Add</button>
             </div>
           )}
         </div>
       );
     }
-
     return (
       <div className="relative border border-gray-300 bg-gray-100 w-full h-96 flex items-center justify-center">
         <div className="text-center">
@@ -920,9 +976,7 @@ function App() {
             {file.type.includes('excel') && 'Excel Spreadsheet'}
             {file.type.includes('outlook') && 'Outlook Message'}
           </p>
-          <p className="mt-4 text-sm text-gray-600">
-            Preview not available. Use annotation tools below.
-          </p>
+          <p className="mt-4 text-sm text-gray-600">Preview not available. Use annotation tools below.</p>
         </div>
       </div>
     );
@@ -939,9 +993,7 @@ function App() {
             {renderFilePreview()}
           </div>
           <div className="mb-6">
-            <button className="px-4 py-2 bg-green-500 text-white rounded" onClick={saveFile}>
-              Save Document
-            </button>
+            <button className="px-4 py-2 bg-green-500 text-white rounded" onClick={saveFile}>Save Document</button>
           </div>
         </>
       )}
