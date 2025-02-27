@@ -771,31 +771,28 @@ function App() {
 
   // Helper function to call the serverless endpoint
   const processAnnotatedMsg = async (dataUrl) => {
-    // Remove the prefix to get the base64 string.
-    const base64Data = dataUrl.split(',')[1];
+    const base64Data = dataUrl.split(",")[1];
     try {
-      const response = await fetch('/api/convert-msg', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64Data }),
+      const response = await fetch("/api/convert-msg", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64Data })
       });
       if (!response.ok) {
-        throw new Error('Server processing failed');
+        throw new Error("Server processing failed");
       }
       const blob = await response.blob();
       const downloadUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = downloadUrl;
-      const extIndex = file.name.lastIndexOf('.');
-      const filename = extIndex > 0 ? file.name.substring(0, extIndex) + '_annotated.msg' : file.name + '_annotated.msg';
-      a.download = filename;
+      a.download = "annotated.eml";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
     } catch (error) {
-      console.error('Error processing MSG file on server:', error);
-      alert('Error processing MSG file');
+      console.error("Error processing MSG file on server:", error);
+      alert("Error processing MSG file");
     }
   };
 

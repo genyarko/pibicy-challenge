@@ -1,6 +1,7 @@
-// api/convert-msg.js
-
 export default async function handler(req, res) {
+    console.log("Request method:", req.method);
+    console.log("Request body:", req.body);
+
     if (req.method !== "POST") {
         res.status(405).json({ error: "Method not allowed" });
         return;
@@ -9,11 +10,12 @@ export default async function handler(req, res) {
     try {
         const { base64Data } = req.body;
         if (!base64Data) {
+            console.error("No base64Data provided");
             res.status(400).json({ error: "No base64Data provided" });
             return;
         }
 
-        // Build a simple EML message (as an example)
+        // Build a simple EML message with the image embedded.
         const emlContent = [
             "Subject: Annotated Message",
             "From: example@example.com",
@@ -34,6 +36,8 @@ export default async function handler(req, res) {
             base64Data,
             "--BOUNDARY--"
         ].join("\r\n");
+
+        console.log("EML content created:", emlContent.substring(0, 100) + "...");
 
         const buffer = Buffer.from(emlContent, "utf8");
         res.setHeader("Content-Type", "message/rfc822");
