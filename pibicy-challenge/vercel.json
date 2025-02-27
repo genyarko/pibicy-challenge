@@ -5,5 +5,11 @@
             "src": "api/convert-msg.js",
             "use": "@vercel/node"
         }
+    ],
+    "routes": [
+        {
+            "src": "/api/convert-msg",
+            "dest": "api/convert-msg.js"
+        }
     ]
 }
