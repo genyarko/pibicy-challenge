@@ -1,3 +1,4 @@
+// pdfUtils.js
 import * as pdfjsLib from 'pdfjs-dist';
 
 export const loadPdf = (file, setPdf, setTotalPages) => {
@@ -8,9 +9,11 @@ export const loadPdf = (file, setPdf, setTotalPages) => {
             setPdf(loadedPdf);
             setTotalPages(loadedPdf.numPages);
         })
-        .catch((err) => console.error('Error rendering PDF: ', err));
+        .catch((err) => {
+            console.error('Error rendering PDF:', err);
+            alert('Failed to load PDF document. Please check the file and try again.');
+        });
 };
-
 
 export const renderPage = (pdf, pageNumber, pdfCanvasRef, overlayRef) => {
     if (pdf && pdfCanvasRef.current) {
@@ -31,7 +34,13 @@ export const renderPage = (pdf, pageNumber, pdfCanvasRef, overlayRef) => {
                     overlayRef.current.setAttribute('width', canvas.width);
                     overlayRef.current.setAttribute('height', canvas.height);
                 }
+            }).catch((err) => {
+                console.error('Error rendering page:', err);
+                alert('Failed to render the PDF page.');
             });
+        }).catch((err) => {
+            console.error('Error retrieving PDF page:', err);
+            alert('Failed to retrieve the PDF page.');
         });
     }
 };

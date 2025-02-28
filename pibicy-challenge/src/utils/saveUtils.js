@@ -1,20 +1,17 @@
 // saveUtils.js
 import { PDFDocument, rgb } from 'pdf-lib';
+import html2canvas from 'html2canvas';
+import htmlDocx from 'html-docx-js/dist/html-docx';
+import ExcelJS from 'exceljs';
 
 /**
  * Saves an annotated PDF file.
- *
- * @param {Object} file - The original file object.
- * @param {Object} pdf - The loaded PDF document (from pdfjsLib).
- * @param {number} currentPage - The current page number (1-indexed).
- * @param {Object} canvasDimensions - Dimensions of the rendered PDF canvas.
- * @param {Array} annotations - Array of annotation objects.
+ * (Existing function, unchanged)
  */
 export const saveAnnotatedPDF = async (file, pdf, currentPage, canvasDimensions, annotations) => {
     if (!file || !file.type.includes('pdf')) return;
 
     try {
-        // Load the original PDF using PDF-lib.
         const pdfDoc = await PDFDocument.load(file.url);
         const pages = pdfDoc.getPages();
         const pageIndex = currentPage - 1;
@@ -22,11 +19,9 @@ export const saveAnnotatedPDF = async (file, pdf, currentPage, canvasDimensions,
         const pageWidth = page.getWidth();
         const pageHeight = page.getHeight();
 
-        // Calculate scaling factors.
         const scaleX = pageWidth / canvasDimensions.width;
         const scaleY = pageHeight / canvasDimensions.height;
 
-        // Draw each annotation onto the PDF page.
         annotations.forEach((annotation) => {
             switch (annotation.type) {
                 case 'line': {
@@ -118,7 +113,6 @@ export const saveAnnotatedPDF = async (file, pdf, currentPage, canvasDimensions,
             }
         });
 
-        // Save the modified PDF and trigger a download.
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
         const downloadUrl = URL.createObjectURL(blob);
@@ -138,28 +132,21 @@ export const saveAnnotatedPDF = async (file, pdf, currentPage, canvasDimensions,
 
 /**
  * Saves an annotated image file.
- *
- * @param {Object} file - The original file object.
- * @param {Object} imgDimensions - Dimensions of the displayed image.
- * @param {Array} annotations - Array of annotation objects.
+ * (Existing function, unchanged)
  */
 export const saveAnnotatedImage = (file, imgDimensions, annotations) => {
     if (!file || !file.type.includes('image')) return;
 
-    // Create an off-screen canvas.
     const canvas = document.createElement('canvas');
     canvas.width = imgDimensions.width;
     canvas.height = imgDimensions.height;
     const ctx = canvas.getContext('2d');
 
-    // Load the base image.
     const baseImage = new Image();
     baseImage.src = file.url;
     baseImage.onload = () => {
-        // Draw the base image.
         ctx.drawImage(baseImage, 0, 0, imgDimensions.width, imgDimensions.height);
 
-        // Render each annotation.
         annotations.forEach((annotation) => {
             switch (annotation.type) {
                 case 'line': {
@@ -216,7 +203,6 @@ export const saveAnnotatedImage = (file, imgDimensions, annotations) => {
             }
         });
 
-        // Export the annotated image.
         canvas.toBlob((blob) => {
             const downloadUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -236,7 +222,162 @@ export const saveAnnotatedImage = (file, imgDimensions, annotations) => {
 };
 
 /**
+ * Saves an annotated Word document (DOCX).
+ * Clones the DOM element with id 'doc-annotated', converts it to an image,
+ * wraps it in an HTML structure, and then converts that HTML to a DOCX blob.
+ */
+export const saveDocFile = () => {
+    const container = document.getElementById('doc-annotated');
+    if (!container) {
+        alert('Document container not found.');
+        return;
+    }
+    const clone = container.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.top = '0';
+    clone.style.left = '0';
+    clone.style.width = container.scrollWidth + 'px';
+    clone.style.height = container.scrollHeight + 'px';
+    clone.style.overflow = 'visible';
+    document.body.appendChild(clone);
+
+    html2canvas(clone, {
+        scale: 2,
+        width: clone.scrollWidth,
+        height: clone.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
+        useCORS: true,
+    }).then((canvas) => {
+        document.body.removeChild(clone);
+        const dataUrl = canvas.toDataURL('image/png');
+        const htmlContent = `<html><body><img src="${dataUrl}" /></body></html>`;
+        const converted = htmlDocx.asBlob(htmlContent);
+        const downloadUrl = URL.createObjectURL(converted);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        const extIndex = document.title.lastIndexOf('.');
+        a.download = extIndex > 0 ? document.title.substring(0, extIndex) + '_annotated.docx' : 'annotated.docx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+    });
+};
+
+/**
+ * Saves an annotated Excel file.
+ * Clones the DOM element with id 'doc-annotated', converts it to an image,
+ * and inserts that image into a new Excel workbook using ExcelJS.
+ */
+export const saveExcelFile = () => {
+    const container = document.getElementById('doc-annotated');
+    if (!container) {
+        alert('Document container not found.');
+        return;
+    }
+    const clone = container.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.top = '0';
+    clone.style.left = '0';
+    clone.style.width = container.scrollWidth + 'px';
+    clone.style.height = container.scrollHeight + 'px';
+    clone.style.overflow = 'visible';
+    document.body.appendChild(clone);
+
+    html2canvas(clone, {
+        scale: 2,
+        width: clone.scrollWidth,
+        height: clone.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
+        useCORS: true,
+    }).then((canvas) => {
+        document.body.removeChild(clone);
+        const dataUrl = canvas.toDataURL('image/png');
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Annotated');
+
+        const imageId = workbook.addImage({
+            base64: dataUrl,
+            extension: 'png',
+        });
+        worksheet.addImage(imageId, {
+            tl: { col: 0, row: 0 },
+            ext: { width: canvas.width, height: canvas.height },
+        });
+
+        workbook.xlsx.writeBuffer().then((buffer) => {
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            const extIndex = document.title.lastIndexOf('.');
+            a.download = extIndex > 0 ? document.title.substring(0, extIndex) + '_annotated.xlsx' : 'annotated.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+        });
+    });
+};
+
+/**
+ * Saves an annotated MSG file.
+ * Clones the DOM element with id 'doc-annotated', converts it to an image,
+ * and constructs a basic EML structure that Outlook can open.
+ */
+export const saveMsgFile = () => {
+    const container = document.getElementById('doc-annotated');
+    if (!container) {
+        alert('Document container not found.');
+        return;
+    }
+    const clone = container.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.top = '0';
+    clone.style.left = '0';
+    clone.style.width = container.scrollWidth + 'px';
+    clone.style.height = container.scrollHeight + 'px';
+    clone.style.overflow = 'visible';
+    document.body.appendChild(clone);
+
+    html2canvas(clone, {
+        scale: 2,
+        width: clone.scrollWidth,
+        height: clone.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
+        useCORS: true,
+    }).then((canvas) => {
+        document.body.removeChild(clone);
+        const dataUrl = canvas.toDataURL('image/png');
+        // Build a simple EML structure
+        const emlContent = `Subject: Annotated Message\r\nFrom: example@example.com\r\nTo: example@example.com\r\nMIME-Version: 1.0\r\nContent-Type: multipart/related; boundary="BOUNDARY"\r\n\r\n--BOUNDARY\r\nContent-Type: text/html; charset="UTF-8"\r\n\r\n<html><body><img src="cid:annotated-image" /></body></html>\r\n\r\n--BOUNDARY\r\nContent-Type: image/png\r\nContent-Transfer-Encoding: base64\r\nContent-ID: <annotated-image>\r\n\r\n${dataUrl.split(',')[1]}\r\n--BOUNDARY--`;
+        const blob = new Blob([emlContent], { type: 'message/rfc822' });
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        const extIndex = document.title.lastIndexOf('.');
+        a.download = extIndex > 0 ? document.title.substring(0, extIndex) + '_annotated.msg' : 'annotated.msg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+    });
+};
+
+/**
  * General helper that saves a file based on its type.
+ * For PDFs and images, the corresponding functions are called.
+ * For Word, Excel, and MSG files, the new functions are triggered.
  *
  * @param {Object} file - The original file object.
  * @param {Object} extraParams - Additional parameters required by the save functions.
@@ -249,6 +390,23 @@ export const saveFile = (file, extraParams) => {
         saveAnnotatedPDF(file, extraParams.pdf, extraParams.currentPage, extraParams.canvasDimensions, extraParams.annotations);
     } else if (file.type.includes('image')) {
         saveAnnotatedImage(file, extraParams.imgDimensions, extraParams.annotations);
+    } else if (
+        file.type.includes('word') ||
+        file.name.toLowerCase().endsWith('.doc') ||
+        file.name.toLowerCase().endsWith('.docx')
+    ) {
+        saveDocFile();
+    } else if (
+        file.type.includes('excel') ||
+        file.name.toLowerCase().endsWith('.xls') ||
+        file.name.toLowerCase().endsWith('.xlsx')
+    ) {
+        saveExcelFile();
+    } else if (
+        file.type.includes('outlook') ||
+        file.name.toLowerCase().endsWith('.msg')
+    ) {
+        saveMsgFile();
     } else {
         alert('Save functionality for this file type is not implemented.');
     }

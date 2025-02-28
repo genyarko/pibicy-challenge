@@ -1,6 +1,6 @@
-// FilePreview.jsx
 import React, { useEffect, useRef } from 'react';
 import AnnotationOverlay from './AnnotationOverlay';
+import TextInput from './TextInput';
 
 const FilePreview = ({
     file,
@@ -14,6 +14,7 @@ const FilePreview = ({
     showTextInput,
     textPosition,
     textInput,
+    onTextChange,
     onTextSubmit,
     setImgDimensions,
     canvasDimensions,
@@ -54,35 +55,17 @@ const FilePreview = ({
                     onClick={currentTool === 'text' ? onTextClick : undefined}
                 />
                 {showTextInput && (
-                    <div
-                        style={{
-                            position: 'fixed',
-                            top: textPosition.y,
-                            left: textPosition.x,
-                            zIndex: 9999,
-                            backgroundColor: 'white',
-                            border: '1px solid gray',
-                            padding: '4px',
-                        }}
-                    >
-                        <input
-                            type="text"
-                            value={textInput}
-                            onChange={(e) => { }}
-                            autoFocus
-                            style={{ border: '1px solid gray', padding: '2px' }}
-                        />
-                        <button onClick={onTextSubmit} style={{ backgroundColor: 'blue', color: 'white', marginLeft: '4px' }}>
-                            Add
-                        </button>
-                    </div>
+                    <TextInput
+                        textPosition={textPosition}
+                        textInput={textInput}
+                        onTextChange={onTextChange}
+                        onTextSubmit={onTextSubmit}
+                    />
                 )}
             </div>
         );
     }
 
-    // Render for PDFs (or other file types) can be handled similarly...
-    // For PDFs:
     if (file.type.includes('pdf')) {
         return (
             <div
@@ -108,7 +91,14 @@ const FilePreview = ({
                     onMouseUp={onMouseUp}
                     onClick={currentTool === 'text' ? onTextClick : undefined}
                 />
-                {/* Similar text input logic */}
+                {showTextInput && (
+                    <TextInput
+                        textPosition={textPosition}
+                        textInput={textInput}
+                        onTextChange={onTextChange}
+                        onTextSubmit={onTextSubmit}
+                    />
+                )}
             </div>
         );
     }
